@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PWA PDF Test</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#ffffff" />
+</head>
+<body>
+  <main style="font-family: system-ui; padding: 24px; max-width: 720px;">
+    <h1>PWA PDF Test</h1>
+
+    <p>
+      Klick auf den Button führt JS aus und öffnet <code>./test.pdf</code> über Blob/Viewer-Fallback.
+    </p>
+
+    <button id="openPdfBtn" style="font-size: 16px; padding: 10px 14px;">
+      Test: PDF öffnen + JS ausführen
+    </button>
+
+    <p id="log" style="margin-top: 16px; white-space: pre-wrap;"></p>
+  </main>
+
+  <script>
+    const logEl = document.getElementById("log");
+    function log(msg) {
+      console.log(msg);
+      logEl.textContent += msg + "\n";
+    }
+
+    async function openOrSharePDF(url, filename = "test.pdf") {
+      log("1) JS läuft: Fetch PDF…");
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("PDF fetch failed: " + res.status);
+
+      const blob = await res.blob();
+      log(`2) PDF geladen (${Math.round(blob.size/1024)} KB).`);
+
+      // Optional: Share (wenn verfügbar)
+      try {
+        const file = new File([blob], filename, { type: "application/pdf" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          log("3) Web Share verfügbar → share()…");
+          await navigator.share({ files: [file], title: filename });
+          log("✔️ Share erfolgreich oder Dialog geschlossen.");
+          return;
+        } else {
+          log("3) Web Share nicht verfügbar → fallback.");
+        }
+      } catch (e) {
+        log("3) Share fehlgeschlagen/abgebrochen → fallback.");
+      }
+
+      // Fallback: Öffnen im neuen Tab (oft am zuverlässigsten auf iOS)
+      const objectUrl = URL.createObjectURL(blob);
+      log("4) Öffne PDF im neuen Tab/Viewer…");
+      const opened = window.open(objectUrl, "_blank");
+
+      if (!opened) {
+        log("Popup blockiert → versuche a[download]…");
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = filename; // iOS kann das ignorieren
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      // Später freigeben
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      log("✔️ Fertig (Object URL wird später freigegeben).");
+    }
+
+    document.getElementById("openPdfBtn").addEventListener("click", async () => {
+      try {
+        logEl.textContent = "";
+        log("Button geklickt.");
+        // Hier ist der "Link" zur lokalen PDF:
+        await openOrSharePDF("./test.pdf", "test.pdf");
+      } catch (err) {
+        log("❌ Fehler: " + (err?.message || err));
+      }
+    });
+
+    // Service Worker registrieren (PWA)
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", async () => {
+        try {
+          await navigator.serviceWorker.register("./sw.js");
+          log("SW registriert.");
+        } catch (e) {
+          log("SW Registrierung fehlgeschlagen: " + e);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
