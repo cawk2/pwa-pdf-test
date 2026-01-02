@@ -1,7 +1,8 @@
 {
   "name": "PWA PDF Test",
   "short_name": "PDF Test",
-  "start_url": "./index.html",
+  "start_url": "/pwa-pdf-test/index.html",
+  "scope": "/pwa-pdf-test/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
